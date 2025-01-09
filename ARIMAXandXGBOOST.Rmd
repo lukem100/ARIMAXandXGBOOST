@@ -1,0 +1,561 @@
+---
+title: "Gold Price Prediction Using ARIMAX and XGBoost: A Comparative Analysis with Macroeconomic Indicators"
+author: "Luke Morrison"
+date: "2025-01-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source("~/Desktop/LukeProject/data/ggprob.R")
+
+library(dplyr) # data manipulation
+library(tidyr) # for data tidying
+library(purrr) # for functional programming
+library(readr) # for reading CSV files efficiently
+library(stringr) # for string manipulation if needed
+library(ggplot2) # for plotting
+library(ggthemes) # for extra themes in ggplot 
+library(scales) # for scale functions in ggplot 
+library(parallel)
+library(doParallel)
+library(lubridate)
+library(forecast) # ARIMAX modeling 
+library(vars) # for VAR modeling 
+library(zoo) # time series operations
+library(reshape2) # melt 
+library(RColorBrewer)
+library(GGally)
+library(xgboost)
+
+commodity_futures = read_csv("~/Desktop/LukeProject/data/commodity_futures.csv")
+glimpse(commodity_futures)
+
+us_inflation = read_csv("~/Desktop/LukeProject/data/US_inflation_rates.csv")
+glimpse(us_inflation)
+
+unemployment = read_csv("~/Desktop/LukeProject/data/unemployment analysis.csv")
+glimpse(unemployment)
+```
+
+
+## Project Summary: 
+This report was an indepth study of commodity prices, inflation, and unemployment data from 2000 to 2021. My analysis employs multiple methodologies including time series analysis (ARIMAX), machine learning (XGBoost), and statistical visualization techniques to understand how commodity prices interact with Macro factors. 
+
+Data Processing and Methodology
+
+Dataset Composition
+The study uses three datasets:
+1. An unemployment dataset: https://www.kaggle.com/datasets/pantanjali/unemployment-dataset. This was collected through 235 countries, but was filtered to just the US for this study.
+2. A commodity prices dataset https://www.kaggle.com/datasets/debashish311601/commodity-prices. This was a time series of commodity prices for 23 different commodites from 2000 to 2023 that was updated daily. 
+3. An inflation dataset https://www.kaggle.com/datasets/pavankrishnanarne/us-inflation-dataset-1947-present. This was a dataset that measured inflation through CPI. 
+
+Dataset Preparation
+ - Commodity futures data processing:
+    - Grouped by month using floor_date()
+    - Calculated mean values for all numeric columns within each month 
+ - Unemployment data Processing:
+     - Created a complete monthly date sequence from 1991 to 2021
+     - Applied linear interpolation using approx() function to transform annual data to monthly
+     - Used rule=2 for linear extrapolation at boundaries if needed
+ - Dataset Integration
+    - Filtered both datasets to start from 2000-01-01
+    - Merged datasets using inner_join on Date column 
+    - Cut off the dataset at 2021-12-01
+Feature Engineering
+  - Calculated returns for multiple of the commodities:
+    - Natural Gas returns
+    - Gold returns
+    - WTI Crude returns
+    - Brent Crude returns
+  - Created month-over-month percentage changes for CPI (CPI_mom in the code)
+  - Additional ML features:
+    - Added lagged features (gold_return_l1, gold_return_l2 in the code)
+    - Created lagged macro features (cpi_mom_l1, unemp_rate_l1)
+    - Generated target variable as next month's gold return (target_return)
+
+Analysis Methods and Results
+
+1. Time Series Analysis (ARIMAX) 
+
+The analysis used an ARIMAX model on one of the commodities, gold prices, and incorporated CPI and unemployment as exogenous variables with mixed results. 
+
+Findings:
+  - The best model was identified as ARIMA(0,0,1) with exogenous regressors
+  - Model coefficients and their standard errors:
+    -MA(1) term (coefficient: 0.2150, s.e.: 0.0628) shows a ratio of 3.42 standard errors
+    -CPI difference (coefficient: 9.8010, s.e.: 3.3791) shows a ratio of 2.90 standard errors
+    -Unemployment difference (coefficient: 10.5660, s.e.: 23.5521) shows a ratio of 0.45 standard errors
+
+2. Machine Learning Approach (XGBoost)
+
+I developed a more sophisticated prediction model using XGBoost with time series cross-validation.
+
+Model Performance Metrics:
+  MSE: 0.00087
+  RMSE: 0.0296
+  MAE: 0.0250
+  
+These metrics are particularly impressive given that the test period (2019-2021) encompasses the COVID-19 pandemic and its associated market turbulence. During this highly volatile period, the model maintained average prediction errors of only about 2.5% in absolute terms (MAE). This suggest robust predictive power even under extreme market conditions that included.
+  - The March 2020 crash
+  - Unprecedented monetary policy responses
+  - Global supply chain disruptions
+  - Significant commodity market volatility
+
+Correlation Analysis
+Key relationships identified
+ - Gold price movements showed remarkably low correlation with oil prices (both WTI and Brent Crude)
+ - Gold also remained independent of natural gas price swings.
+ - Even across some of the most drastic market events, gold is still the king of independent returns.
+ - Gold does have a modest positive correlation with inflation (CPI), as we expect as it's reputation as an inflation hedge. However the relationship isn't as strong as some would think.
+ - Unique among the commodities that I chose, gold shows a slight positive correlation with unemployment rates, while other commodities tend to show negative correlations. This suggests gold's potential role as a "safe haven" during some of the worst times we have faced stands up to its reputation.
+
+Visualization Analysis:
+
+This study carried out three main visualizations techniques: 
+1. Correlation Heatmap
+  - Effectively visualized the strength and direction of relationships between variables
+  - Highlighted strong commodity pair correlations between WTI and Brent Crude. 
+2. Time Series Facet Plots
+  - Demonstrated the evolution of different commodity prices over time 
+  - Revealed some interesting patterns across different commodities
+3. Pairwise Scatter Matrix
+  - Provided detailed view of bivariate relationships
+  - Included density distributions and correlation coefficients. 
+Technical Implementation Details
+
+The analysis was done exclusively in R using several packages, some of the key ones being:
+  - Tidyverse for data manipulation
+  - Forecast for time series analysis
+  - Xgboost for machine learning
+  - Ggplot2 for visualization
+  
+Limitations and Considerations
+
+Data Limitations
+ - Limited dataset size: Only 264 observations with 26 variables, which is relatively small for both time series and machine learning applications
+ - Restricted number of exogenous variables: Only CPI and unemployment were used as predictors for macro influences, missing potentially other important factors such as: 
+      - Interest rates
+      - Exchange rates
+      - Global Supply/demand indicators 
+      - Market sentiment metrics
+ - The analysis period ends in 2021, which misses out on the most recent years of market action. 
+ 
+ Methodological Considerations
+  - Sample size could have affected:
+      - The reliability of the ARIMAX model's coefficient estimates
+      - The XGBoost model's ability to learn complex patterns
+      - The stability of cross-validation results 
+Recommendations for Future Analysis: 
+  - More factors could be incorporated such as those previously mentioned
+  - We could explore alternative modeling approaches such as neural networks or vector autoregression.
+Conclusion
+The analysis examined relationships between commodities and economic indicators through multiple approaches. Both the correlation analysis and the ARIMAX modeling showed significant relationships between CPI changes and gold prices, providing evidence of this relationship from both contemporaneous correlation and time series perspectives. However, it's important to contextualize these results within their limitations. The relatively small dataset (264 observations) and limited number of exogenous variables (Only CPI and unemployment) likely constrained the models' predictive power.
+  
+The XGBoost model achieved moderate success, which a 2.5% MAE during the highly volatile 2019-2021 test period, which includes the COVID-19 market turbulence. While this performance is encouraging given the challenging test period, there's clear potential for improvement through: expanding the feature set to include other important economic indicators, increasing the dataset size, incorporating additional market dynamic indicators. 
+
+These limits notwithstanding, the study provides a solid foundation for future work. The complementary findings from correlatin analysis, ARIMAX modeling, and machine learning approaches suggest consistent relationships in the data, though our ability to model them was constrained by current dataset limitations. 
+  
+
+## R Markdown
+
+```{r cars}
+# We are going to do a monthly average to smooth out daily voltaility for the commodity data sest. 
+
+# converting date to year-month 
+commodity_futures_monthly = commodity_futures %>% 
+  mutate(year_month = floor_date(Date, "month")) %>% 
+  group_by(year_month) %>% 
+  summarize(across(where(is.numeric), \(x) mean(x, na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  rename(Date = year_month) # for clarity sake 
+commodity_futures_monthly
+
+# My monthly inflation data (us_inflation) is from 1947 to 2023. We only want 2000 onward to match our commodities. 
+
+us_inflation_2000 = us_inflation %>% 
+  filter(date >= as.Date("2000-01-01"))
+
+# going to make sure Date matches for both commodity_futures_monthly and us_inflation_2000 before merging. 
+
+# renaming and changing value to CPI_value for clarity 
+
+us_inflation_2000 = us_inflation_2000 %>% 
+  rename(Date = date, 
+         CPI_value = value) # renaming 'value' to 'CPI_value' for clarity 
+us_inflation_2000
+
+monthly_data = commodity_futures_monthly %>% 
+  inner_join(us_inflation_2000, by="Date")
+monthly_data
+
+# next we are going to pivot the unemployment dataset to long format 
+
+
+unemployment_long = unemployment %>% 
+  tidyr::pivot_longer(cols = c("1991":"2021"),
+                      names_to = "year",
+                      values_to = "unem_rate") %>% 
+  dplyr::mutate(year = as.integer(year)) %>% 
+  dplyr::arrange(year)
+
+unemployment_us = unemployment_long %>% 
+  dplyr::filter(`Country Name` == "United States") %>% 
+  dplyr::select(`Country Name`, year, unem_rate) %>% 
+  dplyr::arrange(year)
+# I'm going to create a monthly date sequence from Janurary of the earliest year in the dataset to december of the latest year. I will use linear interpolation
+# using approx() function, as an effort to try and smooth month-to-month and not have abrupt yearly changes 
+
+# step 1: identify the min and max year in the data 
+
+min_year = min(unemployment_us$year, na.rm = TRUE)
+max_year = max(unemployment_us$year, na.rm = TRUE)
+min_year
+max_year
+
+# step 2: create a monthly data sequence from min_year to max_year
+
+df_monthly = tibble(
+  Date = seq.Date(
+    from = as.Date(paste0(min_year, "-01-01")),
+    to = as.Date(paste0(max_year, "-12-01")),
+    by = "month"
+  )
+)
+
+# step 3: for interplation, we need 'x' (original annual) and 'y' (unemp rates)
+#  I will also need a numeric representation for the monthly dates 
+#  I will treat 'YYYY' as a decimal so 'YYYY.00' is janurary etc 
+unemployment_us_numeric = unemployment_us %>% 
+  mutate(year_numeric = year) # I will use the integer year as the known 'x' 
+
+# I will create a numeric time axis for the monthly data 
+df_monthly = df_monthly %>% 
+  mutate(month_fraction = year(Date) + (month(Date)-1) /12)
+
+# I will now use the approx() method to interpolate from annual points (x=year) to monthly points 
+# rule = 2 is used in this case to ensure we will do linear extraploation if needed at the boundaries 
+
+interp_values = approx(
+  x = unemployment_us_numeric$year_numeric,
+  y = unemployment_us_numeric$unem_rate,
+  xout = df_monthly$month_fraction,
+  method = "linear", # I could put this to spline for a smoother polynomial fit I will keep it as linear for now 
+  rule = 2
+)
+df_monthly = df_monthly %>% 
+  mutate(unemp_rate_interp = interp_values$y)
+
+df_monthly
+
+unemployment_us_monthly = df_monthly %>% 
+   dplyr::filter(Date >= as.Date("2000-01-01")) %>% 
+  dplyr::select(Date, unemp_rate_interp)
+
+# integrating to commmodity + inflation data 
+monthly_data = monthly_data %>% 
+  left_join(unemployment_us_monthly, by="Date")
+
+# renamed for clarityu 
+monthly_data = monthly_data %>% 
+  rename(unemp_rate = unemp_rate_interp)
+
+
+
+monthly_data = monthly_data %>% 
+  filter(Date <= as.Date("2021-12-01"))
+monthly_data
+```
+
+```{r time series}
+
+
+
+
+# 1: Base data
+gold_data = monthly_data %>% 
+  dplyr::select(Date, GOLD, CPI_value, unemp_rate) %>% 
+  dplyr::arrange(Date) %>% 
+  na.omit()
+
+# I'll extract the numeric vector
+gold_ts  = ts(gold_data$GOLD, start=c(2000,1), frequency=12)
+cpi_ts   = ts(gold_data$CPI_value, start=c(2000,1), frequency=12)
+unemp_ts = ts(gold_data$unemp_rate, start=c(2000,1), frequency=12)
+
+# I'll do a simple approach
+gold_diff <- diff(gold_ts)
+# Exogenous regressors: also take differences or not, up to you
+exog <- cbind(diff(cpi_ts), diff(unemp_ts)) 
+
+# Ensure lengths match after differencing
+gold_diff = gold_diff[-1]  
+exog      = exog[-1, ]
+
+
+# 2 Fit an ARIMAX model
+
+auto_arimax_fit = auto.arima(
+  gold_diff,
+  xreg = exog,
+  approximation = FALSE,
+  stepwise = FALSE,
+  trace = TRUE  # see model selection progress
+)
+auto_arimax_fit
+
+
+
+# I'll do a naive approach: last known monthly changes for cpi/unemp
+last_cpi_diff = tail(diff(cpi_ts),1)
+last_unemp_diff = tail(diff(cpi_ts),1) # most recent monthly changes in CPI and unemployment
+
+# future predictors
+exog_future = matrix(
+  rep(c(last_cpi_diff, last_unemp_diff), 12),
+  ncol = 2,
+  byrow = TRUE
+)
+
+arimax_fc = forecast(
+  auto_arimax_fit,
+  xreg=exog_future,
+  h=12
+)
+plot(arimax_fc, main="ARIMAX Forecast of Gold (Differenced Series)")
+```
+
+
+
+```{r machine learning}
+# I will create lagged features for Gold and macro variables, and then fit an XGBoost model to predict next month's Gold price
+
+# I am going to build a data frame with lagged features 
+
+ml_data = monthly_data %>% 
+  dplyr::arrange(Date) %>% 
+  mutate(
+    gold_return = (GOLD - lag(GOLD)) / lag(GOLD),
+    gold_return_l1 = lag(gold_return, 1),
+    gold_return_l2 = lag(gold_return, 2),
+    # Macros 
+    cpi_mom = (CPI_value - lag(CPI_value)) / lag(CPI_value),
+    cpi_mom_l1 = lag(cpi_mom, 1),
+    unemp_rate_l1 = lag(unemp_rate, 1)
+  ) %>% 
+  # The 'target' will be next month's gold_return
+  mutate(target_return = lead(gold_return, 1)) %>% 
+  na.omit()
+
+# I will do a train/test split: up to 2018 for train, 2019-2021 test
+split_date = as.Date("2019-01-01")
+train_data = ml_data %>% filter(Date < split_date)
+test_data = ml_data %>% filter(Date >= split_date)
+
+# lets convert to xgboost-friendly matrices 
+
+train_x = train_data %>% 
+  dplyr::select(gold_return_l1, gold_return_l2, cpi_mom, cpi_mom_l1, unemp_rate_l1) %>% 
+  as.matrix()
+train_y = train_data$target_return 
+
+test_x = test_data %>% 
+  dplyr::select(gold_return_l1, gold_return_l2, cpi_mom, cpi_mom_l1, unemp_rate_l1) %>% 
+  as.matrix()
+test_y = test_data$target_return 
+
+
+
+dtrain = xgb.DMatrix(data=train_x, label=train_y)
+dtest  = xgb.DMatrix(data=test_x, label=test_y)
+
+# Training an XGBoost model, going to go with low eta since the dataset is small and I want to be more sure that we won't overfit
+
+params = list(
+  objective = "reg:squarederror", 
+  eta = 0.04, 
+  max_depth = 3
+)
+
+# Time Series Cross-Validation using xgb.cv()
+n_folds = 5
+fold_size = floor(nrow(train_data) / n_folds)
+cv_results = list()
+
+for (i in 1:n_folds) {
+  train_indices = 1:(i * fold_size)
+  val_indices = (i * fold_size + 1):min(((i + 1) * fold_size), nrow(train_data))
+
+  train_fold_x = train_x[train_indices, ]
+  train_fold_y = train_y[train_indices]
+
+  dtrain_fold = xgb.DMatrix(data = train_fold_x, label = train_fold_y)
+
+  cv_results[[i]] = xgb.cv(
+    params = params,
+    data = dtrain_fold,
+    nrounds = 100,
+    nfold = 2, #perform internal cross validation in each fold
+    metrics = list("rmse"),
+    early_stopping_rounds = 10,
+    verbose = 0
+  )
+  best_iteration_fold = cv_results[[i]]$best_iteration
+  final_model_fold = xgb.train(
+    params = params,
+    data = dtrain_fold,
+    nrounds = best_iteration_fold
+  )
+  val_fold_x = train_x[val_indices, ]
+  val_fold_y = train_y[val_indices]
+  dval_fold = xgb.DMatrix(data = val_fold_x, label = val_fold_y)
+  pred_val_fold = predict(final_model_fold, newdata = dval_fold)
+    comparison_fold = data.frame(
+    Date = train_data$Date[val_indices],
+    Actual = val_fold_y,
+    Predicted = pred_val_fold
+  )
+    print(ggplot(comparison_fold, aes(x = Date)) +
+          geom_line(aes(y = Actual, color = "Actual")) +
+          geom_line(aes(y = Predicted, color = "Predicted")) +
+          labs(title = paste("XGBoost Forecast vs Actual (Fold", i, ")"),
+               y = "Gold Return",
+               color = "Legend") +
+          theme_minimal())
+}
+
+# Find the average best_iteration across folds
+best_iterations = sapply(cv_results, function(x) x$best_iteration)
+final_best_iteration = round(mean(best_iterations))
+
+# Train final model on ALL training data using the average best iteration
+final_xgb_model = xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = final_best_iteration,
+  verbose = 0
+)
+
+# Evaluate on test set and plot the final model's predictions
+pred_test = predict(final_xgb_model, newdata = dtest)
+
+comparison_test = data.frame(
+  Date = test_data$Date,
+  Actual = test_y,
+  Predicted = pred_test
+)
+
+print(ggplot(comparison_test, aes(x = Date)) +
+        geom_line(aes(y = Actual, color = "Actual")) +
+        geom_line(aes(y = Predicted, color = "Predicted")) +
+        labs(title = "XGBoost Forecast vs Actual (Test Set - Final Model)",
+             y = "Gold Return",
+             color = "Legend") +
+        theme_minimal())
+
+# Calculate and print test set metrics
+mse_test = mean((pred_test - test_y)^2)
+rmse_test = sqrt(mse_test)
+mae_test = mean(abs(pred_test - test_y))
+
+cat("Test Set Metrics:\n")
+cat("MSE:", mse_test, "\n")
+cat("RMSE:", rmse_test, "\n")
+cat("MAE:", mae_test, "\n")
+
+```
+## Including Plots
+
+
+
+```{r pressure, echo=TRUE}
+# okay my data will be split into three visuals. 
+# 1 a correlation heatmap to reveal broad relationships 
+# 2 a faceted multi-series plot to quickly see each commodity vs time. 
+# A pairwise scatter matrix for deeper pairwise exploration
+
+
+# 1 Correlation Heatmap: only showing a couple to keep this illustration somewhat simple, to do more I could have used across() or loop 
+
+monthly_data = monthly_data %>% 
+  arrange(Date) %>% 
+  mutate(
+    NATURAL_GAS_return = (`NATURAL GAS` - lag(`NATURAL GAS`)) / lag(`NATURAL GAS`),
+    GOLD_return = (GOLD - lag(GOLD)) / lag(GOLD),
+    WTI_CRUDE_return = (`WTI CRUDE` - lag(`WTI CRUDE`)) / lag(`WTI CRUDE`),
+    BRENT_CRUDE_return = (`BRENT CRUDE` - lag(`BRENT CRUDE`)) / lag(`BRENT CRUDE`),
+    CPI_mom = (CPI_value - lag(CPI_value)) / lag(CPI_value)
+  )
+
+
+
+corr_data = monthly_data %>% 
+  dplyr::select(NATURAL_GAS_return, GOLD_return, WTI_CRUDE_return, BRENT_CRUDE_return, CPI_mom, unemp_rate)
+
+# correlation matrix 
+corr_matrix = cor(corr_data, use = "complete.obs")
+
+melted_corr = melt(corr_matrix)
+
+ggplot(melted_corr, aes(x = Var1, y = Var2, fill = value)) + 
+  geom_tile() + 
+  scale_fill_gradient2(low = "blue", high = "red", mid ="white", midpoint = 0, limit = c(-1,1), space = "Lab", name = "Correlation") +
+  theme_minimal() + 
+  coord_fixed() + 
+  labs(
+    title = "Correlation Heatmap: Commodity Returns vs. Macro Factors",
+    x = "", y = ""
+  ) +
+  theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))
+
+
+# we are going to long format the commodities and plot each commodity in its own panel 
+
+df_long = monthly_data %>% 
+  dplyr::select(Date, GOLD, `WTI CRUDE`, `BRENT CRUDE`, `NATURAL GAS`, CPI_value, CORN, COPPER) %>% 
+  tidyr::pivot_longer(
+    cols = c(GOLD, `WTI CRUDE`, `BRENT CRUDE`, `NATURAL GAS`, CPI_value, CORN, COPPER),
+    names_to = "variable",
+    values_to = "value"
+  )
+
+
+ggplot(df_long, aes(x = Date, y = value, color = variable)) + 
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~variable, scales= "free_y") +
+  labs(
+    title = "Monthly Commodity Prices & CPI Over Time (2000-2021)",
+    x = "Date",
+    y = "Value"
+  ) +
+  theme_minimal()
+
+# lets do a pairwise scatter matrix to see pairwise relationships among multiple numeric variables. 
+
+
+df_for_pairs = monthly_data %>% 
+  dplyr::select(NATURAL_GAS_return, GOLD_return, WTI_CRUDE_return, BRENT_CRUDE_return, CPI_mom, unemp_rate) %>% 
+  na.omit()
+
+ggpairs(
+  df_for_pairs,
+  aes(alpha=0.6),
+  upper = list(continuous = wrap("cor", size = 2)),
+  lower = list(continuous = wrap("smooth", method = "lm", se = FALSE, size = 0.5)),
+  diag = list(continuous = "densityDiag")
+) +
+  theme_minimal() + 
+  theme(
+    axis.text = element_text(size = 5),
+    strip.text = element_text(size = 5),
+    panel.spacing = unit(2, "mm"),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.border = element_rect(fill = NA, color = "gray80")
+  ) +
+  labs(title = "Pairwise Scatter Matrix of Returns, Inflation, and Unemployment")
+
+
+```
+
+
